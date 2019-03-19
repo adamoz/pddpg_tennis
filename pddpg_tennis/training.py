@@ -51,8 +51,8 @@ def pddpg_training(agent, env, save_path, n_episodes=2000, n_max_steps_per_episo
             agent.save(meta['model_path'])
             with open(meta['meta_path'], 'wb') as wb:
                 pickle.dump(meta, wb)
-        if best_mean_score >= 0.5:
-            break
+        #if best_mean_score >= 0.5:
+        #    break
 
     with open(meta['meta_path'], 'wb') as wb:
         pickle.dump(meta, wb)
