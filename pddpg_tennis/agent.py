@@ -59,7 +59,8 @@ class Agent(AgentInterface):
         self.actor_local_2 = Actor(state_size, action_size, seed).to(device)
         self.actor_target_2 = Actor(state_size, action_size, seed).to(device)
 
-        self.actor_optimizer = optim.Adam(list(self.actor_local_1.parameters()) + list(self.actor_local_2.parameters()), lr=self.lr_actor)
+        self.actor_1_optimizer = optim.Adam(list(self.actor_local_1.parameters()), lr=self.lr_actor)
+        self.actor_2_optimizer = optim.Adam(list(self.actor_local_2.parameters()), lr=self.lr_actor)
 
         # Critic Network
         self.critic_local = Critic(state_size, action_size, seed).to(device)
@@ -78,7 +79,9 @@ class Agent(AgentInterface):
         # Learn under update_rate.
         if self.memory.is_ready_to_sample():
             experiences = self.memory.sample()
-            self.learn(experiences)
+            self.learn(experiences, optimizer=1)
+            experiences = self.memory.sample()
+            self.learn(experiences, optimizer=2)
 
     def act(self, states, add_noise=True):
         """Return actions for given state as per current policy.
@@ -105,7 +108,7 @@ class Agent(AgentInterface):
     def reset(self):
         self.noise.reset()
 
-    def learn(self, experiences, gamma=None, tau=None):
+    def learn(self, experiences, gamma=None, tau=None, optimizer=1):
         """Update value parameters using given batch of experience tuples.
 
         Params:
@@ -151,15 +154,21 @@ class Agent(AgentInterface):
         all_actions_pred = torch.cat((actions_pred, other_actions_pred), dim=1).to(self.device)
 
         actor_loss = -self.critic_local(all_states, all_actions_pred).mean()
+
         # Minimize the loss
-        self.actor_optimizer.zero_grad()
-        actor_loss.backward()
-        self.actor_optimizer.step()
+        if optimizer == 1:
+            self.actor_1_optimizer.zero_grad()
+            actor_loss.backward()
+            self.actor_1_optimizer.step()
+            self.soft_update(self.actor_local_1, self.actor_target_1, tau)
+        else:
+            self.actor_2_optimizer.zero_grad()
+            actor_loss.backward()
+            self.actor_2_optimizer.step()
+            self.soft_update(self.actor_local_2, self.actor_target_2, tau)
 
         # ----------------------- update target networks ----------------------- #
         self.soft_update(self.critic_local, self.critic_target, tau)
-        self.soft_update(self.actor_local_1, self.actor_target_1, tau)
-        self.soft_update(self.actor_local_2, self.actor_target_2, tau)
 
     def soft_update(self, local_model, target_model, tau):
         """Soft update model parameters.
